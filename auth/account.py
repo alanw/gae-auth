@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 from webapp2 import uri_for
 from webapp2_extras.auth import InvalidAuthIdError, InvalidPasswordError
 
-from boilerplate.email_helper import EmailHelper
+from common.email_helper import EmailHelper
 from models.user import User
 
 

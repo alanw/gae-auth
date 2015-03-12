@@ -3,7 +3,7 @@
 
 from base import BaseHandler, user_required
 
-from boilerplate.account import Account, AccountError, UnauthorizedError
+from auth.account import Account, AccountError, UnauthorizedError
 
 
 class SignupHandler(BaseHandler):

@@ -1,10 +1,10 @@
-Google AppEngine Account Boilerplate
-====================================
+Google AppEngine Auth
+=====================
 
 Overview
 --------
 
-GAE boilerplate code that handles account creation using email addresses.
+GAE code that handles account creation and login.
 
 Features
 --------
