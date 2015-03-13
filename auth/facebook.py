@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 # Copyright (c) 2015 Alan Wright. All rights reserved.
 
+import logging
+
 from webapp2 import uri_for
 
 from libs import *
@@ -56,27 +58,31 @@ class Facebook(object):
         if not all((uid, email, name)):
             raise FacebookError('Required Facebook fields not available')
 
-        if user:
-            # new association with facebook
-            unique_uid = SocialUser.check_unique(
-                user=user.key.id(),
-                provider='facebook',
-                uid=uid)
-            if unique_uid:
-                social_user = SocialUser(
-                    user=user.key.id(),
-                    provider='facebook',
-                    uid=uid,
-                    extra_data=user_data)
-                social_user.put()
-                logging.info('facebook: association added: %s', uid)
-            else:
-                raise FacebookError('Facebook account already in use')
-        else:
+        logging.info('DEBUG: uid: %r', uid)
+        logging.info('DEBUG: email: %r', email)
+        logging.info('DEBUG: name: %r', name)
+        logging.info('DEBUG: user: %r', user)
+
+        social_user = SocialUser.get_by_provider_and_uid(
+            provider='facebook',
+            uid=uid)
+
+        if social_user:
             # login with facebook
-            social_user = SocialUser.get_by_provider_and_uid(
+            logging.info('DEBUG: login with facebook: %r', social_user.user.id())
+            logging.info('DEBUG: facebook user_data: %r', social_user.extra_data)
+            if user and social_user.user.id() != user.key.id():
+                raise FacebookError('Facebook account already in use')
+            user = social_user.user.get()
+        elif user:
+            logging.info('DEBUG: new assoc with facebook: %r', user.key)
+            # new association with facebook
+            social_user = SocialUser(
+                user=user.key,
                 provider='facebook',
-                uid=uid)
-            user = social_user.user.get() if social_user else None
+                uid=uid,
+                extra_data=user_data)
+            social_user.put()
+            logging.info('facebook: association added: %s', uid)
 
         return user, user_data

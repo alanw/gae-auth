@@ -67,7 +67,7 @@ class Account(object):
                     password=password)
             else:
                 created, user = cls._create_user(
-                    provider='auth',
+                    auth_id='auth:' + email,
                     email=email,
                     name=name,
                     country=country,
@@ -98,16 +98,25 @@ class Account(object):
         return True, user
 
     @classmethod
-    def _create_user(cls, provider, email, name, country, password=None, verified=False):
-        return User.create_user(
-            auth_id=provider + ':' + email,
-            unique_properties=['email'],
-            email=email,
-            name=name,
-            password_raw=password,
-            country=country,
-            active=True,
-            verified=False)
+    def _create_user(cls, auth_id, email, name, country, password=None, verified=False):
+        logging.info('DEBUG: auth_id: %r', auth_id)
+        logging.info('DEBUG: email: %r', email)
+        logging.info('DEBUG: name: %r', name)
+        logging.info('DEBUG: password: %r', password)
+        logging.info('DEBUG: country: %r', country)
+
+        create_args = {
+            'auth_id': auth_id,
+            'unique_properties': ['email'],
+            'email': email,
+            'name': name,
+            'country': country,
+            'active': True,
+            'verified': verified}
+        if password:
+            create_args['password_raw'] = password
+
+        return User.create_user(**create_args)
 
     @classmethod
     def _send_verify_email(cls, user_id, email, name):
@@ -194,6 +203,8 @@ class Account(object):
 
     @classmethod
     def social_login_callback(cls, provider_name, params, user, country):
+        logging.info('DEBUG: user: %r', user)
+
         if not provider_name:
             raise BadRequestError('Must supply a provider')
         try:
@@ -226,18 +237,27 @@ class Account(object):
 
     @classmethod
     def _create_social_user(cls, provider_name, user_data, country):
+        logging.info('DEBUG: provider_name: %s', provider_name)
+        logging.info('DEBUG: user_data: %r', user_data)
+        logging.info('DEBUG: type(user_data): %r', type(user_data))
+        logging.info('DEBUG: country: %r', country)
+
         unique_uid = SocialUser.check_unique_uid(
             provider=provider_name,
             uid=user_data.get('uid'))
+        logging.info('DEBUG: unique_uid: %r', unique_uid)
         if not unique_uid:
             raise UnauthorizedError('Account already in use: ' + user_data.get('uid'))
 
         created, user = cls._create_user(
-            provider=provider_name,
+            auth_id=provider_name + ':' + user_data.get('uid'),
             email=user_data.get('email'),
             name=user_data.get('name'),
             country=country,
             verified=True)
+
+        logging.info('DEBUG: created: %r', created)
+        logging.info('DEBUG: user: %r', user)
 
         if not created:
             if 'email' in user:
@@ -250,7 +270,12 @@ class Account(object):
             provider=provider_name,
             uid=user_data.get('uid'),
             extra_data=user_data)
+
+        logging.info('DEBUG: social_user: %r', social_user)
+
         social_user.put()
+
+        logging.info('DEBUG: social_user after put: %r', social_user)
 
         return user
 
