@@ -7,8 +7,9 @@ from datetime import datetime, timedelta
 from webapp2 import uri_for
 from webapp2_extras.auth import InvalidAuthIdError, InvalidPasswordError
 
+from facebook import Facebook, FacebookError
 from common.email_helper import EmailHelper
-from models.user import User
+from models.user import User, SocialUser
 
 
 class AccountError(Exception):
@@ -49,6 +50,8 @@ class DuplicateError(AccountError):
 
 class Account(object):
 
+    PROVIDERS = ['facebook']
+
     @classmethod
     def signup(cls, email, name, password, country):
         if not all((email, name, password, country)):
@@ -58,9 +61,17 @@ class Account(object):
 
             # first we check whether we're attempting to reactivate a user
             if existing is not None and not existing.active:
-                created, user = cls._reactivate_user(existing, name, password)
+                created, user = cls._reactivate_user(
+                    user=existing,
+                    name=name,
+                    password=password)
             else:
-                created, user = cls._create_user(email, name, password, country)
+                created, user = cls._create_user(
+                    provider='auth',
+                    email=email,
+                    name=name,
+                    country=country,
+                    password=password)
         except Exception, e:
             raise InternalError('Internal storage failure: %s' % (e,))
 
@@ -77,18 +88,19 @@ class Account(object):
         return user
 
     @classmethod
-    def _reactivate_user(cls, user, name, password):
+    def _reactivate_user(cls, user, email=None, name=None, password=None, verified=False):
         user.active = True
         user.name = name
-        user.set_password(password)
-        user.verified = False
+        if password is not None:
+            user.set_password(password)
+        user.verified = verified
         user.put()
         return True, user
 
     @classmethod
-    def _create_user(cls, email, name, password, country):
+    def _create_user(cls, provider, email, name, country, password=None, verified=False):
         return User.create_user(
-            auth_id='auth:' + email,
+            auth_id=provider + ':' + email,
             unique_properties=['email'],
             email=email,
             name=name,
@@ -167,6 +179,78 @@ class Account(object):
             raise InternalError('Internal storage failure: %s' % (e,))
 
         logging.info('account: auth user: %s', user.email)
+
+        return user
+
+    @classmethod
+    def social_login(cls, provider_name):
+
+        if provider_name == 'facebook':
+            redirect_uri = Facebook.auth_url()
+
+        logging.info('account: social auth url: %s', redirect_uri)
+
+        return redirect_uri
+
+    @classmethod
+    def social_login_callback(cls, provider_name, params, user, country):
+        if not provider_name:
+            raise BadRequestError('Must supply a provider')
+        try:
+            if provider_name == 'facebook':
+                user, user_data = Facebook.login(
+                    code=params.get('code'),
+                    user=user)
+
+            if user:
+                # reactivate a user if required
+                if not user.active:
+                    cls._reactivate_user(
+                        email=user_data.get('email'),
+                        user=user,
+                        name=user_data.get('name'),
+                        verified=True)
+            else:
+                user = cls._create_social_user(
+                    provider_name=provider_name,
+                    user_data=user_data,
+                    country=country)
+        except FacebookError, e:
+            raise InternalError('Federated login failure: %s' % (e,))
+        except Exception, e:
+            raise InternalError('Internal storage failure: %s' % (e,))
+
+        logging.info('account: social auth user: %s', user_data.get('uid'))
+
+        return user
+
+    @classmethod
+    def _create_social_user(cls, provider_name, user_data, country):
+        unique_uid = SocialUser.check_unique_uid(
+            provider=provider_name,
+            uid=user_data.get('uid'))
+        if not unique_uid:
+            raise UnauthorizedError('Account already in use: ' + user_data.get('uid'))
+
+        created, user = cls._create_user(
+            provider=provider_name,
+            email=user_data.get('email'),
+            name=user_data.get('name'),
+            country=country,
+            verified=True)
+
+        if not created:
+            if 'email' in user:
+                raise DuplicateError('Email is already in use: %s' % (user.email,))
+            raise InternalError('Internal storage failure: %s' % (user.email,))
+
+        # create social user and associate with user
+        social_user = SocialUser(
+            user=user.key,
+            provider=provider_name,
+            uid=user_data.get('uid'),
+            extra_data=user_data)
+        social_user.put()
 
         return user
 

@@ -59,6 +59,39 @@ class LoginHandler(BaseHandler):
         self.auth.set_session(user=user_dict, remember=True)
 
 
+class SocialLoginHandler(BaseHandler):
+
+    def get(self, *args, **kwargs):
+        # remove all provider tokens before we begin
+        [self.session.pop(provider, None) for provider in Account.PROVIDERS]
+
+        try:
+            redirect_uri = Account.social_login(
+                provider_name=kwargs.get('provider_name'))
+        except AccountError, e:
+            self.abort(code=e.code, detail=e.message)
+
+        # redirect to federated login
+        self.redirect(redirect_uri)
+
+
+class CallbackSocialLoginHandler(BaseHandler):
+
+    def get(self, *args, **kwargs):
+        try:
+            user = Account.social_login_callback(
+                provider_name=kwargs.get('provider_name'),
+                params=dict(self.request.GET.items()),
+                user=self.user,
+                country=self.country)
+        except AccountError, e:
+            self.abort(code=e.code, detail=e.message)
+
+        # create a new token with new timestamp
+        user_dict = self.auth.store.user_to_dict(user)
+        self.auth.set_session(user=user_dict, remember=True)
+
+
 class LogoutHandler(BaseHandler):
 
     def get(self):

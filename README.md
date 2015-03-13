@@ -25,3 +25,12 @@ Install [NoseGAE](https://github.com/Trii/NoseGAE) and run the following:
 ```sh
 nosetests --with-gae test
 ```
+
+Deployment
+----------
+
+> **Note:** API keys and secrets are required before federated logins will work.
+
+```sh
+appcfg.py --oauth2 update .
+```

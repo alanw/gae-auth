@@ -9,7 +9,7 @@ from datetime import timedelta
 from webapp2_extras.routes import RedirectRoute
 from google.appengine.api.app_identity import get_application_id
 
-from handlers.account import SignupHandler, VerifyHandler, LoginHandler, LogoutHandler, ForgotHandler, ResetHandler, AccountHandler
+from handlers import account
 
 # a staging environment is a place where features may be tested.
 staging = get_application_id().endswith('staging')
@@ -33,12 +33,14 @@ if debug:
     logging.getLogger().setLevel(logging.DEBUG)
 
 app = webapp2.WSGIApplication([
-    RedirectRoute('/signup', SignupHandler, name='signup', strict_slash=True),
-    RedirectRoute('/verify/<user_id:\d+>/<token:.+>', handler=VerifyHandler, name='verify_token', strict_slash=True),
-    RedirectRoute('/login', LoginHandler, name='login', strict_slash=True),
-    RedirectRoute('/logout', LogoutHandler, name='logout', strict_slash=True),
-    RedirectRoute('/forgot', ForgotHandler, name='forgot', strict_slash=True),
-    RedirectRoute('/reset/<user_id:\d+>/<token:.+>', handler=ResetHandler, name='reset_token', strict_slash=True),
-    RedirectRoute('/reset', ResetHandler, name='reset', strict_slash=True),
-    RedirectRoute('/account/<user_id:\d+>/<action:.+>', AccountHandler, name='account', strict_slash=True),
+    RedirectRoute('/signup', account.SignupHandler, name='signup', strict_slash=True),
+    RedirectRoute('/verify/<user_id:\d+>/<token:.+>', handler=account.VerifyHandler, name='verify_token', strict_slash=True),
+    RedirectRoute('/login', account.LoginHandler, name='login', strict_slash=True),
+    RedirectRoute('/social_login/<provider_name:.+>/complete', account.CallbackSocialLoginHandler, name='social_login_complete', strict_slash=True),
+    RedirectRoute('/social_login/<provider_name:.+>', account.SocialLoginHandler, name='social_login', strict_slash=True),
+    RedirectRoute('/logout', account.LogoutHandler, name='logout', strict_slash=True),
+    RedirectRoute('/forgot', account.ForgotHandler, name='forgot', strict_slash=True),
+    RedirectRoute('/reset/<user_id:\d+>/<token:.+>', handler=account.ResetHandler, name='reset_token', strict_slash=True),
+    RedirectRoute('/reset', account.ResetHandler, name='reset', strict_slash=True),
+    RedirectRoute('/account/<user_id:\d+>/<action:.+>', account.AccountHandler, name='account', strict_slash=True),
 ], debug=debug, config=config)

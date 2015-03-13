@@ -420,3 +420,15 @@ class AccountTest(AccountTest):
         User.get_by_auth_password(
             auth_id='auth:test@test.com',
             password=password_data.get('new_password'))
+
+
+class SocialLoginTest(HanderTest):
+
+    def test_facebook_login(self):
+        response = self.send_request(path='/social_login/facebook')
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(response.location.startswith('https://www.facebook.com'))
+
+    # def test_facebook_login_callback(self):
+    #     response = self.send_request(path='/social_login/facebook/complete?code=abc')
+    #     self.assertEqual(response.status_code, 200)
