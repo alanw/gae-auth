@@ -7,7 +7,7 @@ import re
 from webapp2_extras.auth import InvalidPasswordError
 
 from handler_test import HanderTest
-from models.user import User
+from models.user import User, SocialUser
 
 
 class AccountTest(HanderTest):
@@ -326,7 +326,7 @@ class ResetPasswordTest(AccountTest):
         self.assertEqual(response.status_code, 200)
 
 
-class AccountTest(AccountTest):
+class AuthTest(AccountTest):
 
     def test_deactivate_success(self):
         user = self.register_user(email='test@test.com', name='test123')
@@ -422,13 +422,68 @@ class AccountTest(AccountTest):
             password=password_data.get('new_password'))
 
 
-class SocialLoginTest(HanderTest):
+class SocialLoginTest(AccountTest):
 
     def test_facebook_login(self):
         response = self.send_request(path='/social_login/facebook')
         self.assertEqual(response.status_code, 302)
         self.assertTrue(response.location.startswith('https://www.facebook.com'))
 
-    # def test_facebook_login_callback(self):
-    #     response = self.send_request(path='/social_login/facebook/complete?code=abc')
-    #     self.assertEqual(response.status_code, 200)
+    @mock.patch('libs.facebook.facebook.GraphAPI.get_object')
+    @mock.patch('libs.facebook.facebook.get_access_token_from_code')
+    def test_facebook_login_callback(self, mock_access_token, mock_get_object):
+        mock_access_token.return_value = {'access_token': 'mock'}
+        mock_get_object.return_value = {
+            'id': 123456789,
+            'email': 'test@test.com',
+            'name': 'fred blogs'}
+        response = self.send_request(path='/social_login/facebook/complete?code=AQBIYzBINGb0qyxmIuElYfVt3bCo')
+        self.assertEqual(response.status_code, 200)
+        user = User.get_by_auth_id('facebook:123456789')
+        self.assertEqual(user.email, 'test@test.com')
+        self.assertEqual(user.name, 'fred blogs')
+        self.assertIsNone(user.password)
+        self.assertTrue(user.active)
+        self.assertTrue(user.verified)
+        social_user = SocialUser.get_by_provider_and_uid('facebook', '123456789')
+        self.assertEqual(social_user.user.id(), user.key.id())
+
+    @mock.patch('libs.facebook.facebook.GraphAPI.get_object')
+    @mock.patch('libs.facebook.facebook.get_access_token_from_code')
+    def test_assoc_facebook_login_callback(self, mock_access_token, mock_get_object):
+        mock_access_token.return_value = {'access_token': 'mock'}
+        mock_get_object.return_value = {
+            'id': 123456789,
+            'email': 'test@test.com',
+            'name': 'fred blogs'}
+        user = self.register_user(email='test@test.com', name='fred blogs')
+        response = self.send_request(path='/social_login/facebook/complete?code=AQBIYzBINGb0qyxmIuElYfVt3bCo')
+        self.assertEqual(response.status_code, 200)
+        auth_user = User.get_by_auth_id('auth:test@test.com')
+        self.assertEqual(auth_user.email, 'test@test.com')
+        social_user = SocialUser.get_by_provider_and_uid('facebook', '123456789')
+        self.assertEqual(social_user.user.id(), user.key.id())
+
+    def test_github_login(self):
+        response = self.send_request(path='/social_login/github')
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(response.location.startswith('https://github.com'))
+
+    @mock.patch('libs.github.github.GithubAuth.get_user_info')
+    @mock.patch('libs.github.github.GithubAuth.get_access_token')
+    def test_github_login_callback(self, mock_access_token, mock_get_user_info):
+        mock_access_token.return_value = 'mock'
+        mock_get_user_info.return_value = {
+            'login': 'test',
+            'email': 'test@test.com',
+            'name': 'fred blogs'}
+        response = self.send_request(path='/social_login/github/complete?code=AQBIYzBINGb0qyxmIuElYfVt3bCo')
+        self.assertEqual(response.status_code, 200)
+        user = User.get_by_auth_id('github:test')
+        self.assertEqual(user.email, 'test@test.com')
+        self.assertEqual(user.name, 'fred blogs')
+        self.assertIsNone(user.password)
+        self.assertTrue(user.active)
+        self.assertTrue(user.verified)
+        social_user = SocialUser.get_by_provider_and_uid('github', 'test')
+        self.assertEqual(social_user.user.id(), user.key.id())

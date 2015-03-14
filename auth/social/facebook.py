@@ -6,7 +6,7 @@ import logging
 from webapp2 import uri_for
 
 from libs import *
-import facebook_api
+from libs.facebook import facebook
 
 from models.user import SocialUser
 
@@ -27,7 +27,7 @@ class Facebook(object):
                 'social_login_complete',
                 provider_name='facebook',
                 _full=True)
-            return facebook_api.auth_url(
+            return facebook.auth_url(
                 app_id=cls.API_KEY,
                 canvas_url=callback_url,
                 perms=['email', 'public_profile'])
@@ -41,12 +41,12 @@ class Facebook(object):
                 'social_login_complete',
                 provider_name='facebook',
                 _full=True)
-            access_token = facebook_api.get_access_token_from_code(
+            access_token = facebook.get_access_token_from_code(
                 code=code,
                 redirect_uri=callback_url,
                 app_id=cls.API_KEY,
                 app_secret=cls.API_SECRET)
-            graph_api = facebook_api.GraphAPI(access_token['access_token'])
+            graph_api = facebook.GraphAPI(access_token['access_token'])
             user_data = graph_api.get_object('me')
             user_data['uid'] = str(user_data.get('id'))
         except Exception, e:

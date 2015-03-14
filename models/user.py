@@ -102,6 +102,7 @@ class SocialUser(ndb.Model):
     def get_by_provider_and_uid(cls, provider, uid):
         return cls.query(cls.provider == provider, cls.uid == uid).get()
 
+    # todo: we might not need these...
     @classmethod
     def check_unique_uid(cls, provider, uid):
         return cls.get_by_provider_and_uid(provider, uid) is None

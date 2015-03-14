@@ -7,7 +7,8 @@ from datetime import datetime, timedelta
 from webapp2 import uri_for
 from webapp2_extras.auth import InvalidAuthIdError, InvalidPasswordError
 
-from facebook import Facebook, FacebookError
+from social.facebook import Facebook, FacebookError
+from social.github import Github, GithubError
 from common.email_helper import EmailHelper
 from models.user import User, SocialUser
 
@@ -50,7 +51,7 @@ class DuplicateError(AccountError):
 
 class Account(object):
 
-    PROVIDERS = ['facebook']
+    PROVIDERS = ['facebook', 'github']
 
     @classmethod
     def signup(cls, email, name, password, country):
@@ -196,6 +197,8 @@ class Account(object):
 
         if provider_name == 'facebook':
             redirect_uri = Facebook.auth_url()
+        elif provider_name == 'github':
+            redirect_uri = Github.auth_url()
 
         logging.info('account: social auth url: %s', redirect_uri)
 
@@ -212,6 +215,13 @@ class Account(object):
                 user, user_data = Facebook.login(
                     code=params.get('code'),
                     user=user)
+            elif provider_name == 'github':
+                user, user_data = Github.login(
+                    code=params.get('code'),
+                    user=user)
+
+            logging.info('DEBUG: user after login: %r', user)
+            logging.info('DEBUG: user_data: %r', user_data)
 
             if user:
                 # reactivate a user if required
@@ -226,7 +236,7 @@ class Account(object):
                     provider_name=provider_name,
                     user_data=user_data,
                     country=country)
-        except FacebookError, e:
+        except (FacebookError, GithubError) as e:
             raise InternalError('Federated login failure: %s' % (e,))
         except Exception, e:
             raise InternalError('Internal storage failure: %s' % (e,))
