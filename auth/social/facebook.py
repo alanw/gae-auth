@@ -19,6 +19,7 @@ class Facebook(object):
 
     API_KEY = '999999999999999'
     API_SECRET = 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'
+    PICTURE_URL = 'http://graph.facebook.com/{uid}/picture?type=large'
 
     @classmethod
     def auth_url(cls):
@@ -51,14 +52,11 @@ class Facebook(object):
         except Exception, e:
             raise FacebookError('Facebook access token failure: %s' % (e,))
 
-        image_url = 'http://graph.facebook.com/{uid}/picture?type=large'.format(
-            uid=str(info.get('id')))
-
         user_data = {
             'uid': str(info.get('id')),
             'email': info.get('email'),
             'name': info.get('name'),
-            'image_url': image_url}
+            'image_url': cls.PICTURE_URL.format(uid=str(info.get('id')))}
 
         if not all(user_data.values()):
             raise FacebookError('Required Facebook fields not available')

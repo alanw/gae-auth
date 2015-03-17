@@ -2,6 +2,7 @@
 # Copyright (c) 2015 Alan Wright. All rights reserved.
 
 import logging
+import md5
 from datetime import datetime, timedelta
 
 from webapp2 import uri_for
@@ -53,6 +54,7 @@ class DuplicateError(AccountError):
 class Account(object):
 
     PROVIDERS = ['facebook', 'google', 'github']
+    GRAVATAR_URL = 'http://www.gravatar.com/avatar/{hash}?d=retro&s=200'
 
     @classmethod
     def signup(cls, email, name, password, country):
@@ -106,13 +108,16 @@ class Account(object):
         create_args = {
             'auth_id': auth_id,
             'unique_properties': ['email'],
-            'email': email,
+            'email': email.lower().strip(),
             'name': name,
             'country': country,
             'active': True,
             'verified': verified}
         if image_url:
             create_args['image_url'] = image_url
+        else:
+            email_hash = md5.new(email.lower().strip()).hexdigest()
+            create_args['image_url'] = cls.GRAVATAR_URL.format(hash=email_hash)
         if password:
             create_args['password_raw'] = password
         return User.create_user(**create_args)
