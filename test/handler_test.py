@@ -22,6 +22,7 @@ class HanderTest(TestCase):
         self.testbed.init_datastore_v3_stub()
         self.testbed.init_memcache_stub()
         self.testbed.init_mail_stub()
+        self.testbed.init_user_stub()
         self.mail_stub = self.testbed.get_stub(testbed.MAIL_SERVICE_NAME)
         main.app.config['csrf']['enabled'] = False
 

@@ -487,3 +487,8 @@ class SocialLoginTest(AccountTest):
         self.assertTrue(user.verified)
         social_user = SocialUser.get_by_provider_and_uid('github', 'test')
         self.assertEqual(social_user.user.id(), user.key.id())
+
+    def test_google_login(self):
+        response = self.send_request(path='/social_login/google')
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(response.location.startswith('https://accounts.google.com'))

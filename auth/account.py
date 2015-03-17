@@ -8,6 +8,7 @@ from webapp2 import uri_for
 from webapp2_extras.auth import InvalidAuthIdError, InvalidPasswordError
 
 from social.facebook import Facebook, FacebookError
+from social.google import Google, GoogleError
 from social.github import Github, GithubError
 from common.email_helper import EmailHelper
 from models.user import User, SocialUser
@@ -51,7 +52,7 @@ class DuplicateError(AccountError):
 
 class Account(object):
 
-    PROVIDERS = ['facebook', 'github']
+    PROVIDERS = ['facebook', 'google', 'github']
 
     @classmethod
     def signup(cls, email, name, password, country):
@@ -197,8 +198,12 @@ class Account(object):
 
         if provider_name == 'facebook':
             redirect_uri = Facebook.auth_url()
+        elif provider_name == 'google':
+            redirect_uri = Google.auth_url()
         elif provider_name == 'github':
             redirect_uri = Github.auth_url()
+        else:
+            raise NotFoundError('Authentication method not supported')
 
         logging.info('account: social auth url: %s', redirect_uri)
 
@@ -215,10 +220,16 @@ class Account(object):
                 user, user_data = Facebook.login(
                     code=params.get('code'),
                     user=user)
+            elif provider_name == 'google':
+                user, user_data = Google.login(
+                    code=params.get('code'),
+                    user=user)
             elif provider_name == 'github':
                 user, user_data = Github.login(
                     code=params.get('code'),
                     user=user)
+            else:
+                raise NotFoundError('Authentication method not supported')
 
             logging.info('DEBUG: user after login: %r', user)
             logging.info('DEBUG: user_data: %r', user_data)
@@ -236,7 +247,7 @@ class Account(object):
                     provider_name=provider_name,
                     user_data=user_data,
                     country=country)
-        except (FacebookError, GithubError) as e:
+        except (FacebookError, GoogleError, GithubError) as e:
             raise InternalError('Federated login failure: %s' % (e,))
         except Exception, e:
             raise InternalError('Internal storage failure: %s' % (e,))
@@ -271,8 +282,8 @@ class Account(object):
 
         if not created:
             if 'email' in user:
-                raise DuplicateError('Email is already in use: %s' % (user.email,))
-            raise InternalError('Internal storage failure: %s' % (user.email,))
+                raise DuplicateError('Email is already in use: %s' % (user_data.get('email'),))
+            raise InternalError('Internal storage failure: %s' % (user_data.get('email'),))
 
         # create social user and associate with user
         social_user = SocialUser(
