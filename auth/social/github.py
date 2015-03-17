@@ -21,79 +21,60 @@ class Github(object):
     CLIENT_SECRET = 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'
 
     @classmethod
+    def _github_auth(cls):
+        callback_url = uri_for(
+            'social_login_complete',
+            provider_name='github',
+            _full=True)
+        return github.GithubAuth(
+            github_server='github.com',
+            github_client_id=cls.CLIENT_ID,
+            github_client_secret=cls.CLIENT_SECRET,
+            github_redirect_uri=callback_url,
+            scope='user')
+
+    @classmethod
     def auth_url(cls):
         try:
-            callback_url = uri_for(
-                'social_login_complete',
-                provider_name='github',
-                _full=True)
-            github_auth = github.GithubAuth(
-                github_server='github.com',
-                github_client_id=cls.CLIENT_ID,
-                github_client_secret=cls.CLIENT_SECRET,
-                github_redirect_uri=callback_url,
-                scope='user')
-            return github_auth.get_authorize_url()
+            return cls._github_auth().get_authorize_url()
         except Exception, e:
             raise GithubError('Github auth failure: %s' % (e,))
 
     @classmethod
     def login(cls, code, user):
         try:
-            callback_url = uri_for(
-                'social_login_complete',
-                provider_name='github',
-                _full=True)
-            github_auth = github.GithubAuth(
-                github_server='github.com',
-                github_client_id=cls.CLIENT_ID,
-                github_client_secret=cls.CLIENT_SECRET,
-                github_redirect_uri=callback_url,
-                scope='user')
-            access_token = github_auth.get_access_token(code)
+            access_token = cls._github_auth().get_access_token(code)
+            info = github_auth.get_user_info(access_token)
 
-            logging.info('DEBUG: access_token: %r', access_token)
-
-            user_data = github_auth.get_user_info(access_token)
-
-            logging.info('DEBUG: user_data from access_token: %r', user_data)
-            user_data['uid'] = user_data.get('login')
         except Exception, e:
             raise GithubError('Github access token failure: %s' % (e,))
 
-        # todo: this is the same as the facebook impl - maybe move to account.py?
+        user_data = {
+            'uid': info.get('login'),
+            'email': info.get('email'),
+            'name': info.get('name'),
+            'image_url': info.get('avatar_url')}
 
-        uid = user_data.get('login')
-        email = user_data.get('email')
-        name = user_data.get('name')
-        if not all((uid, email, name)):
+        if not all(user_data.values()):
             raise GithubError('Required Github fields not available')
-
-        logging.info('DEBUG: uid: %r', uid)
-        logging.info('DEBUG: email: %r', email)
-        logging.info('DEBUG: name: %r', name)
-        logging.info('DEBUG: user: %r', user)
 
         social_user = SocialUser.get_by_provider_and_uid(
             provider='github',
-            uid=uid)
+            uid=user_data.get('uid'))
 
         if social_user:
             # login with github
-            logging.info('DEBUG: login with github: %r', social_user.user.id())
-            logging.info('DEBUG: github user_data: %r', social_user.extra_data)
             if user and social_user.user.id() != user.key.id():
                 raise GithubError('Github account already in use')
             user = social_user.user.get()
         elif user:
-            logging.info('DEBUG: new assoc with github: %r', user.key)
             # new association with github
             social_user = SocialUser(
                 user=user.key,
                 provider='github',
-                uid=uid,
+                uid=user_data.get('uid'),
                 extra_data=user_data)
             social_user.put()
-            logging.info('github: association added: %s', uid)
+            logging.info('github: association added: %d', user.key.id())
 
         return user, user_data

@@ -28,6 +28,7 @@ class User(AuthUser):
         required=True)
     name = ndb.StringProperty(
         required=True)
+    image_url = ndb.StringProperty()
     country = ndb.StringProperty(
         required=True)
     active = ndb.BooleanProperty(
@@ -101,16 +102,3 @@ class SocialUser(ndb.Model):
     @classmethod
     def get_by_provider_and_uid(cls, provider, uid):
         return cls.query(cls.provider == provider, cls.uid == uid).get()
-
-    # todo: we might not need these...
-    @classmethod
-    def check_unique_uid(cls, provider, uid):
-        return cls.get_by_provider_and_uid(provider, uid) is None
-
-    @classmethod
-    def check_unique_user(cls, provider, user):
-        return cls.get_by_user_and_provider(user, provider) is None
-
-    @classmethod
-    def check_unique(cls, user, provider, uid):
-        return cls.check_unique_uid(provider, uid) and cls.check_unique_user(provider, user)

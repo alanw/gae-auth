@@ -90,23 +90,19 @@ class Account(object):
         return user
 
     @classmethod
-    def _reactivate_user(cls, user, email=None, name=None, password=None, verified=False):
+    def _reactivate_user(cls, user, name=None, password=None, image_url=None, verified=False):
         user.active = True
         user.name = name
         if password is not None:
             user.set_password(password)
+        if image_url is not None:
+            user.image_url = image_url
         user.verified = verified
         user.put()
         return True, user
 
     @classmethod
-    def _create_user(cls, auth_id, email, name, country, password=None, verified=False):
-        logging.info('DEBUG: auth_id: %r', auth_id)
-        logging.info('DEBUG: email: %r', email)
-        logging.info('DEBUG: name: %r', name)
-        logging.info('DEBUG: password: %r', password)
-        logging.info('DEBUG: country: %r', country)
-
+    def _create_user(cls, auth_id, email, name, country, image_url=None, password=None, verified=False):
         create_args = {
             'auth_id': auth_id,
             'unique_properties': ['email'],
@@ -115,9 +111,10 @@ class Account(object):
             'country': country,
             'active': True,
             'verified': verified}
+        if image_url:
+            create_args['image_url'] = image_url
         if password:
             create_args['password_raw'] = password
-
         return User.create_user(**create_args)
 
     @classmethod
@@ -211,8 +208,6 @@ class Account(object):
 
     @classmethod
     def social_login_callback(cls, provider_name, params, user, country):
-        logging.info('DEBUG: user: %r', user)
-
         if not provider_name:
             raise BadRequestError('Must supply a provider')
         try:
@@ -231,14 +226,10 @@ class Account(object):
             else:
                 raise NotFoundError('Authentication method not supported')
 
-            logging.info('DEBUG: user after login: %r', user)
-            logging.info('DEBUG: user_data: %r', user_data)
-
             if user:
                 # reactivate a user if required
                 if not user.active:
                     cls._reactivate_user(
-                        email=user_data.get('email'),
                         user=user,
                         name=user_data.get('name'),
                         verified=True)
@@ -258,27 +249,19 @@ class Account(object):
 
     @classmethod
     def _create_social_user(cls, provider_name, user_data, country):
-        logging.info('DEBUG: provider_name: %s', provider_name)
-        logging.info('DEBUG: user_data: %r', user_data)
-        logging.info('DEBUG: type(user_data): %r', type(user_data))
-        logging.info('DEBUG: country: %r', country)
-
-        unique_uid = SocialUser.check_unique_uid(
+        social_user = SocialUser.get_by_provider_and_uid(
             provider=provider_name,
             uid=user_data.get('uid'))
-        logging.info('DEBUG: unique_uid: %r', unique_uid)
-        if not unique_uid:
+        if social_user is not None:
             raise UnauthorizedError('Account already in use: ' + user_data.get('uid'))
 
         created, user = cls._create_user(
             auth_id=provider_name + ':' + user_data.get('uid'),
             email=user_data.get('email'),
             name=user_data.get('name'),
+            image_url=user_data.get('image_url'),
             country=country,
             verified=True)
-
-        logging.info('DEBUG: created: %r', created)
-        logging.info('DEBUG: user: %r', user)
 
         if not created:
             if 'email' in user:
@@ -292,11 +275,7 @@ class Account(object):
             uid=user_data.get('uid'),
             extra_data=user_data)
 
-        logging.info('DEBUG: social_user: %r', social_user)
-
         social_user.put()
-
-        logging.info('DEBUG: social_user after put: %r', social_user)
 
         return user
 

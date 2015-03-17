@@ -47,42 +47,39 @@ class Facebook(object):
                 app_id=cls.API_KEY,
                 app_secret=cls.API_SECRET)
             graph_api = facebook.GraphAPI(access_token['access_token'])
-            user_data = graph_api.get_object('me')
-            user_data['uid'] = str(user_data.get('id'))
+            info = graph_api.get_object('me')
         except Exception, e:
             raise FacebookError('Facebook access token failure: %s' % (e,))
 
-        uid = str(user_data.get('id'))
-        email = user_data.get('email')
-        name = user_data.get('name')
-        if not all((uid, email, name)):
-            raise FacebookError('Required Facebook fields not available')
+        image_url = 'http://graph.facebook.com/{uid}/picture?type=large'.format(
+            uid=str(info.get('id')))
 
-        logging.info('DEBUG: uid: %r', uid)
-        logging.info('DEBUG: email: %r', email)
-        logging.info('DEBUG: name: %r', name)
-        logging.info('DEBUG: user: %r', user)
+        user_data = {
+            'uid': str(info.get('id')),
+            'email': info.get('email'),
+            'name': info.get('name'),
+            'image_url': image_url}
+
+        if not all(user_data.values()):
+            raise FacebookError('Required Facebook fields not available')
 
         social_user = SocialUser.get_by_provider_and_uid(
             provider='facebook',
-            uid=uid)
+            uid=user_data.get('uid'))
 
         if social_user:
             # login with facebook
-            logging.info('DEBUG: login with facebook: %r', social_user.user.id())
-            logging.info('DEBUG: facebook user_data: %r', social_user.extra_data)
             if user and social_user.user.id() != user.key.id():
                 raise FacebookError('Facebook account already in use')
             user = social_user.user.get()
         elif user:
-            logging.info('DEBUG: new assoc with facebook: %r', user.key)
             # new association with facebook
             social_user = SocialUser(
                 user=user.key,
                 provider='facebook',
-                uid=uid,
+                uid=user_data.get('uid'),
                 extra_data=user_data)
             social_user.put()
-            logging.info('facebook: association added: %s', uid)
+            logging.info('facebook: association added: %d', user.key.id())
 
         return user, user_data
