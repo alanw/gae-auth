@@ -16,6 +16,8 @@ Features
 - Password reset with email and token.
 - Deactivate account.
 - Change name, email and password.
+- Social login support for Google+, Facebook and Github.
+- Profile picture URL.
 
 Testing
 -------
